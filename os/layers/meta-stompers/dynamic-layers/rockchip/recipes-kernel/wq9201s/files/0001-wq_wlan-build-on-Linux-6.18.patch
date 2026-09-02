@@ -1,0 +1,247 @@
+From: Stompers OS <noreply@open-stompers>
+Subject: [PATCH] wq_wlan: build on Linux 6.18
+
+Gate the cfg80211, timer, hrtimer and module API changes made between
+Linux 6.4 and 6.17, keeping the older paths for earlier kernels.
+
+Upstream-Status: Pending
+---
+diff --color -ruN pa/src/wifi/rwnx_drv/fullmac/rwnx_main.c pb/src/wifi/rwnx_drv/fullmac/rwnx_main.c
+--- a/src/wifi/rwnx_drv/fullmac/rwnx_main.c	2026-10-23 16:13:14.156046901 -0700
++++ b/src/wifi/rwnx_drv/fullmac/rwnx_main.c	2026-10-23 16:16:59.163474202 -0700
+@@ -1196,7 +1196,9 @@
+ 		} else
+ 			rwnx_txq_vif_stop(vif, RWNX_TXQ_STOP_CHAN, rwnx_hw);
+ 		spin_unlock_bh(&rwnx_hw->cb_lock);
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
++		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0);
++#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+ 		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0, 0);
+ #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+ 		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0);
+@@ -4472,6 +4474,9 @@
+ }
+
+ static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++	struct net_device *monitor_dev,
++#endif
+ 	struct cfg80211_chan_def *chandef)
+ {
+ 	u8 org_band;
+@@ -4551,7 +4556,11 @@
+  *	have changed. The actual parameter values are available in
+  *	struct wiphy. If returning an error, no value should be changed.
+  */
+-static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
++static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++					  int radio_idx,
++#endif
++					  u32 changed)
+ {
+ 	return 0;
+ }
+@@ -4565,6 +4574,9 @@
+  */
+ static int rwnx_cfg80211_set_tx_power(struct wiphy *wiphy,
+ 				      struct wireless_dev *wdev,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++				      int radio_idx,
++#endif
+ 				      enum nl80211_tx_power_setting type,
+ 				      int mbm)
+ {
+@@ -4599,6 +4611,12 @@
+  */
+ static int rwnx_cfg80211_get_tx_power(struct wiphy *wiphy,
+ 				      struct wireless_dev *wdev,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++				      int radio_idx,
++#endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
++				      unsigned int link_id,
++#endif
+ 				      int *dbm)
+ {
+ 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+@@ -5052,7 +5070,11 @@
+ static int
+ rwnx_cfg80211_start_radar_detection(struct wiphy *wiphy, struct net_device *dev,
+ 				    struct cfg80211_chan_def *chandef,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
++				    u32 cac_time_ms, int link_id)
++#else
+ 				    u32 cac_time_ms)
++#endif
+ #else
+ static int
+ rwnx_cfg80211_start_radar_detection(struct wiphy *wiphy, struct net_device *dev,
+@@ -5352,7 +5374,10 @@
+ 		goto end;
+ 	} else {
+ 		WQ_INIT_WORK(&csa->work, rwnx_csa_finish);
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
++		cfg80211_ch_switch_started_notify(dev, &csa->chandef, 0,
++						  params->count, false);
++#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+ 		cfg80211_ch_switch_started_notify(dev, &csa->chandef, 0,
+ 						  params->count, false, 0);
+ #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+@@ -7772,9 +7797,14 @@
+ #endif
+ 		napi_enable(&rwnx_hw->napi_rx);
+
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++		hrtimer_setup(&rwnx_hw->napi_rx_defer_timer, rwnx_napi_sched_rx_cb,
++			      CLOCK_MONOTONIC, HRTIMER_MODE_REL);
++#else
+ 		hrtimer_init(&rwnx_hw->napi_rx_defer_timer, CLOCK_MONOTONIC,
+ 			     HRTIMER_MODE_REL);
+ 		rwnx_hw->napi_rx_defer_timer.function = rwnx_napi_sched_rx_cb;
++#endif
+ 		atomic_set(&rwnx_hw->napi_rx_time, 0);
+ 	}
+ #endif
+diff --color -ruN pa/src/wifi/rwnx_drv/fullmac/rwnx_rx.c pb/src/wifi/rwnx_drv/fullmac/rwnx_rx.c
+--- a/src/wifi/rwnx_drv/fullmac/rwnx_rx.c	2026-10-23 16:13:14.156375350 -0700
++++ b/src/wifi/rwnx_drv/fullmac/rwnx_rx.c	2026-10-23 16:16:59.163845682 -0700
+@@ -1693,8 +1693,13 @@
+ 		hdr = (struct ieee80211_hdr *)(skb->data + msdu_offset);
+ 		rwnx_vif = rwnx_rx_get_vif(rwnx_hw, hw_rxhdr->flags_vif_idx);
+ 		if (rwnx_vif) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++			cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2,
++						   -1, GFP_ATOMIC);
++#else
+ 			cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2,
+ 						   GFP_ATOMIC);
++#endif
+ 		}
+
+ 		dev_kfree_skb(skb);
+@@ -1758,6 +1763,9 @@
+ 				    !rwnx_vif->use_4addr) {
+ 					cfg80211_rx_unexpected_4addr_frame(
+ 						rwnx_vif->ndev, sta->mac_addr,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++						-1,
++#endif
+ 						GFP_ATOMIC);
+ 				}
+ 			}
+diff --color -ruN pa/src/wifi/rwnx_drv/fullmac/rwnx_rx_ll.c pb/src/wifi/rwnx_drv/fullmac/rwnx_rx_ll.c
+--- a/src/wifi/rwnx_drv/fullmac/rwnx_rx_ll.c	2026-10-23 16:13:14.156466240 -0700
++++ b/src/wifi/rwnx_drv/fullmac/rwnx_rx_ll.c	2026-10-23 16:16:59.163923912 -0700
+@@ -1013,7 +1013,11 @@
+ 						   hw_rxhdr->flags_vif_idx);
+ 			if (rwnx_vif) {
+ 				cfg80211_rx_spurious_frame(
+-					rwnx_vif->ndev, hdr->addr2, GFP_ATOMIC);
++					rwnx_vif->ndev, hdr->addr2,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
++					-1,
++#endif
++					GFP_ATOMIC);
+ 			}
+
+ 			dev_kfree_skb(skb);
+diff --color -ruN pa/src/wifi/rwnx_drv/main.c pb/src/wifi/rwnx_drv/main.c
+--- a/src/wifi/rwnx_drv/main.c	2026-10-23 16:13:14.159763955 -0700
++++ b/src/wifi/rwnx_drv/main.c	2026-10-23 16:16:59.156539702 -0700
+@@ -15,7 +15,10 @@
+ int __init wq_usb_init(void);
+ void __exit wq_usb_exit(void);
+
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
++	#define MOD_BASE(m) ((m)->mem[MOD_TEXT].base)
++	#define MOD_SIZE(m) ((m)->mem[MOD_TEXT].size)
++#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+ 	#define MOD_BASE(m) ((m)->core_layout.base)
+ 	#define MOD_SIZE(m) ((m)->core_layout.size)
+ #else
+diff --color -ruN pa/src/wifi/rwnx_drv/Makefile pb/src/wifi/rwnx_drv/Makefile
+--- a/src/wifi/rwnx_drv/Makefile	2026-10-23 16:13:14.155042952 -0700
++++ b/src/wifi/rwnx_drv/Makefile	2026-10-23 16:16:59.156494262 -0700
+@@ -318,6 +318,7 @@
+ ccflags-$(CONFIG_RWNX_SDM) += -DCONFIG_RWNX_SDM
+
+ ccflags-y += -Werror
++ccflags-y += -include $(src)/wq_kernel_compat.h
+ ccflags-y += -g
+
+ VAR1 := .
+diff --color -ruN pa/src/wifi/rwnx_drv/rwnx_msg_rx.c pb/src/wifi/rwnx_drv/rwnx_msg_rx.c
+--- a/src/wifi/rwnx_drv/rwnx_msg_rx.c	2026-10-23 16:13:14.161407203 -0700
++++ b/src/wifi/rwnx_drv/rwnx_msg_rx.c	2026-10-23 16:19:40.957456595 -0700
+@@ -1016,7 +1016,9 @@
+ 	rwnx_chanctx_unlink(vif);
+ 	rwnx_chanctx_link(vif, ch_index, &vif->ap.chandef);
+
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
++	cfg80211_ch_switch_notify(vif->ndev, &vif->ap.chandef, 0);
++#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+ 	cfg80211_ch_switch_notify(vif->ndev, &vif->ap.chandef, 0, 0);
+ #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0) || defined(AMLOGIC_BUILD_COMPATIBLE)
+ 	cfg80211_ch_switch_notify(vif->ndev, &vif->ap.chandef, 0);
+diff --color -ruN pa/src/wifi/rwnx_drv/rwnx_msg_tx.c pb/src/wifi/rwnx_drv/rwnx_msg_tx.c
+--- a/src/wifi/rwnx_drv/rwnx_msg_tx.c	2026-10-23 16:13:14.161517023 -0700
++++ b/src/wifi/rwnx_drv/rwnx_msg_tx.c	2026-10-23 16:19:40.958300603 -0700
+@@ -2376,7 +2376,10 @@
+ 		if (!buf_new) {
+ 			need_swt_ch = false;
+ 		} else {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
++			cfg80211_ch_switch_notify(vif->ndev, &vif->ap.chandef,
++						  0);
++#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+ 			cfg80211_ch_switch_notify(vif->ndev, &vif->ap.chandef,
+ 						  0, 0);
+ #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+diff --color -ruN pa/src/wifi/rwnx_drv/wq_kernel_compat.h pb/src/wifi/rwnx_drv/wq_kernel_compat.h
+--- a/src/wifi/rwnx_drv/wq_kernel_compat.h	1969-12-31 16:00:00.000000000 -0800
++++ b/src/wifi/rwnx_drv/wq_kernel_compat.h	2026-10-23 16:20:53.124502669 -0700
+@@ -0,0 +1,38 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++/* Compatibility with kernel API renames after Linux 6.9. */
++#ifndef WQ_KERNEL_COMPAT_H
++#define WQ_KERNEL_COMPAT_H
++
++#include <linux/version.h>
++#include <linux/module.h>
++#include <linux/stringify.h>
++#include <linux/timer.h>
++
++/* MODULE_IMPORT_NS() takes a string literal; the driver passes a bare name. */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++#undef MODULE_IMPORT_NS
++#define MODULE_IMPORT_NS(ns) MODULE_INFO(import_ns, __stringify(ns))
++#endif
++
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++#define del_timer timer_delete
++#define del_timer_sync timer_delete_sync
++#endif
++
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0)
++#define from_timer timer_container_of
++#endif
++
++/* hrtimer_init() is gone; callers still assign .function afterwards. */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++#include <linux/hrtimer.h>
++
++static inline enum hrtimer_restart wq_hrtimer_unset(struct hrtimer *timer)
++{
++	return HRTIMER_NORESTART;
++}
++
++#define hrtimer_init(timer, clock, mode) hrtimer_setup(timer, wq_hrtimer_unset, clock, mode)
++#endif
++
++#endif

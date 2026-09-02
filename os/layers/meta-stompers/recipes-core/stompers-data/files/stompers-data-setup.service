@@ -1,0 +1,16 @@
+[Unit]
+Description=Bind persistent directories from the data partition
+# The bind mounts are made here rather than in mount units, which would make
+# iwd and logins hard-depend on /data. Without /data they stay on the rootfs.
+DefaultDependencies=no
+Requires=data.mount
+After=data.mount
+Before=local-fs.target iwd.service sshdgenkeys.service systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@LIBEXECDIR@/stompers-data-setup
+
+[Install]
+WantedBy=local-fs.target

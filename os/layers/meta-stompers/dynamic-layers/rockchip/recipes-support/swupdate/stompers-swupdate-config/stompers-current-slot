@@ -1,0 +1,11 @@
+#!/bin/sh
+# Print the running rootfs slot (A or B) chosen by the U-Boot boot script.
+for argument in $(cat /proc/cmdline); do
+    case "$argument" in
+        stompers.slot=*)
+            echo "${argument#stompers.slot=}"
+            exit 0
+            ;;
+    esac
+done
+echo A

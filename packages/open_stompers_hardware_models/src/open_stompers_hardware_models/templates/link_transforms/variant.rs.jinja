@@ -1,0 +1,456 @@
+//! Link transforms for `{{ model.variant_value }}`.
+//!
+//! {{ banner }}
+
+#![allow(clippy::approx_constant)]
+#![allow(clippy::too_many_lines)]
+
+use std::path::Path;
+
+use nalgebra::Isometry3;
+use open_stompers_hardware::transforms as support;
+use support::{RerunLinkTransform, TransformLogError, VisualAsset, log_transform_messages};
+
+/// Number of links in `{{ model.robot_name }}`.
+pub const LINK_COUNT: usize = {{ link_count }};
+
+/// Number of independent joints in `{{ model.robot_name }}`.
+pub const JOINT_COUNT: usize = {{ joint_count }};
+
+/// Number of mesh visuals in `{{ model.robot_name }}`.
+pub const VISUAL_COUNT: usize = {{ visual_count }};
+
+/// URDF link names in [`Link`] discriminant order.
+pub const LINK_NAMES: [&str; LINK_COUNT] = [
+{% for link in model.links %}
+    {{ link.name | rust_string }},
+{% endfor %}
+];
+
+/// Kinematic-tree entity paths in [`Link`] discriminant order.
+///
+/// Log a link mesh, or the visual entities in [`VISUALS`], under these paths.
+pub const LINK_ENTITY_PATHS: [&str; LINK_COUNT] = [
+{% for link in model.links %}
+    {{ link.entity_path | rust_string }},
+{% endfor %}
+];
+
+/// Parent link index for each [`Link`]. The root entry is unused.
+pub const LINK_PARENT: [usize; LINK_COUNT] = [
+{% for link in model.links %}
+    {{ 0 if link.parent_index is none else link.parent_index }},
+{% endfor %}
+];
+
+/// Independent URDF joint names in [`Joint`] discriminant order.
+pub const JOINT_NAMES: [&str; JOINT_COUNT] = [
+{% for joint in model.joints %}
+    {{ joint.name | rust_string }},
+{% endfor %}
+];
+
+/// Optional position limits for each independent joint, in radians.
+pub const JOINT_LIMITS: [Option<support::JointLimits>; JOINT_COUNT] = [
+{% for joint in model.joints %}
+{% if joint.position_limits is none %}
+    None,
+{% else %}
+    Some(support::JointLimits {
+        minimum_position: open_stompers_hardware::angle!({{ joint.position_limits[0] | rust_f64 }}),
+        maximum_position: open_stompers_hardware::angle!({{ joint.position_limits[1] | rust_f64 }}),
+    }),
+{% endif %}
+{% endfor %}
+];
+
+/// Links in discriminant order.
+pub const LINKS: [Link; LINK_COUNT] = [
+{% for link in model.links %}
+    Link::{{ link.variant }},
+{% endfor %}
+];
+
+/// Independent joints in discriminant order.
+pub const JOINTS: [Joint; JOINT_COUNT] = [
+{% for joint in model.joints %}
+    Joint::{{ joint.variant }},
+{% endfor %}
+];
+
+/// Mesh visual fixed to a link frame.
+#[derive(Clone, Copy, Debug)]
+pub struct Visual {
+    /// Link that owns the mesh.
+    pub link: Link,
+    /// Entity path of the mesh, as a child of the link path.
+    pub entity_path: &'static str,
+    /// Cache-relative mesh resource from the hardware model.
+    pub mesh_resource: &'static str,
+    /// Visual origin translation in the link frame, in meters.
+    pub translation: [f64; 3],
+    /// Visual origin rotation in the link frame, `xyzw`.
+    pub rotation_xyzw: [f64; 4],
+    /// Mesh scale along x, y, and z.
+    pub scale: [f64; 3],
+}
+
+/// Static mesh visuals. Log these once, then update [`rerun_link_transforms`].
+pub const VISUALS: [Visual; VISUAL_COUNT] = [
+{% for link in model.links %}
+{% for visual in link.visuals %}
+    Visual {
+        link: Link::{{ link.variant }},
+        entity_path: {{ visual.entity_path | rust_string }},
+        mesh_resource: {{ visual.mesh_resource | rust_string }},
+        translation: {{ visual.origin.translation | rust_array }},
+        rotation_xyzw: {{ visual.origin.quaternion_xyzw | rust_array }},
+        scale: {{ visual.scale | rust_array }},
+    },
+{% endfor %}
+{% endfor %}
+];
+
+/// Depth-first link identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
+pub enum Link {
+{% for link in model.links %}
+    /// URDF link `{{ link.name }}`.
+    {{ link.variant }} = {{ loop.index0 }},
+{% endfor %}
+}
+
+/// Independent joint identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
+pub enum Joint {
+{% if model.joints %}
+{% for joint in model.joints %}
+    /// URDF joint `{{ joint.name }}`.
+    {{ joint.variant }} = {{ loop.index0 }},
+{% endfor %}
+{% else %}
+    /// This model has no independent joints.
+    #[allow(dead_code)]
+    NoIndependentJoints = 0,
+{% endif %}
+}
+
+/// Independent joint positions.
+///
+/// Revolute and continuous values are radians about the URDF joint axis.
+/// Prismatic values are meters along that axis. Mimic joints are not stored;
+/// their motion is derived while computing link transforms.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct JointPositions {
+{% if model.joints %}
+{% for joint in model.joints %}
+    /// Position of URDF joint `{{ joint.name }}`.
+    pub {{ joint.field }}: f64,
+{% endfor %}
+{% else %}
+    _private: (),
+{% endif %}
+}
+
+impl Link {
+    /// URDF name of this link.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        LINK_NAMES[self as usize]
+    }
+
+    /// Entity path of this link in the kinematic tree.
+    #[must_use]
+    pub const fn entity_path(self) -> &'static str {
+        LINK_ENTITY_PATHS[self as usize]
+    }
+}
+
+impl Joint {
+    /// URDF name of this joint.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        JOINT_NAMES[self as usize]
+    }
+}
+
+impl JointPositions {
+    /// Set the position of a URDF joint by name.
+    ///
+    /// Returns `false` when `name` is not an independent joint of this model.
+    /// Revolute and continuous positions are radians. Prismatic positions are meters.
+    pub fn set_named(&mut self, name: &str, position: f64) -> bool {
+        match name {
+{% for joint in model.joints %}
+            {{ joint.name | rust_string }} => self.{{ joint.field }} = position,
+{% endfor %}
+            _ => return false,
+        }
+        true
+    }
+
+    /// Build positions ordered by [`Joint`] discriminant.
+    #[must_use]
+    pub const fn from_array(values: [f64; JOINT_COUNT]) -> Self {
+        Self {
+{% if model.joints %}
+{% for joint in model.joints %}
+            {{ joint.field }}: values[{{ loop.index0 }}],
+{% endfor %}
+{% else %}
+            _private: (),
+{% endif %}
+        }
+    }
+
+    /// Positions ordered by [`Joint`] discriminant.
+    #[must_use]
+    pub const fn to_array(self) -> [f64; JOINT_COUNT] {
+        [
+{% for joint in model.joints %}
+            self.{{ joint.field }},
+{% endfor %}
+        ]
+    }
+}
+
+/// Parent-relative rigid transform of every link.
+///
+/// The root transform is the identity. Each other entry is the URDF joint
+/// origin composed with the current joint motion. Array indices are [`Link`]
+/// discriminants.
+#[must_use]
+pub fn parent_from_link(positions: &JointPositions) -> [Isometry3<f64>; LINK_COUNT] {
+    let mut transforms = [Isometry3::identity(); LINK_COUNT];
+{% for link in model.links if link.incoming %}
+    // {{ link.incoming.name }}: {{ link.incoming.kind }}
+    transforms[Link::{{ link.variant }} as usize] = support::{{ link.incoming.kind }}(
+        {{ link.incoming.origin.translation | rust_array }},
+        {{ link.incoming.origin.quaternion_xyzw | rust_array }}
+        {%- if link.incoming.kind != "fixed" -%}
+        , {{ link.incoming.axis | rust_array }}, {{ link.incoming.position }}
+        {%- endif -%}
+    );
+{% endfor %}
+    transforms
+}
+
+/// Link poses in the root link frame.
+///
+/// Array indices are [`Link`] discriminants. Parents are composed in tree
+/// order without searching by name.
+#[must_use]
+pub fn world_from_link(positions: &JointPositions) -> [Isometry3<f64>; LINK_COUNT] {
+    support::world_from_local(&parent_from_link(positions), &LINK_PARENT)
+}
+
+/// Translate joint positions into parent-relative Rerun transform messages.
+///
+/// Log each message at [`RerunLinkTransform::entity_path`] so Rerun places the
+/// link mesh. Visual meshes with their own origins are children of those paths;
+/// log [`rerun_visual_transforms`] once before streaming joint motion.
+///
+/// # Examples
+///
+/// ```
+/// use {{ model.crate_name }}::transforms::{{ model.module_name }}::{
+///     JointPositions, rerun_link_transforms,
+/// };
+///
+/// let messages = rerun_link_transforms(&JointPositions::default());
+/// assert_eq!(messages.len(), {{ link_count }});
+/// ```
+#[must_use]
+pub fn rerun_link_transforms(positions: &JointPositions) -> [RerunLinkTransform; LINK_COUNT] {
+    rerun_link_transforms_with_root(positions, Isometry3::identity())
+}
+
+/// Translate joint positions into Rerun transforms with the root link at `root`.
+///
+/// Child transforms stay parent-relative, so logging them on the kinematic
+/// entity tree places every link mesh.
+#[must_use]
+pub fn rerun_link_transforms_with_root(
+    positions: &JointPositions,
+    root: Isometry3<f64>,
+) -> [RerunLinkTransform; LINK_COUNT] {
+    let mut local = parent_from_link(positions);
+    local[0] = root;
+    std::array::from_fn(|index| RerunLinkTransform {
+        entity_path: LINK_ENTITY_PATHS[index],
+        transform: support::to_rerun(local[index], [1.0, 1.0, 1.0]),
+    })
+}
+
+/// Static Rerun transforms that place each visual mesh in its link frame.
+#[must_use]
+pub fn rerun_visual_transforms() -> [RerunLinkTransform; VISUAL_COUNT] {
+    std::array::from_fn(|index| {
+        let visual = &VISUALS[index];
+        RerunLinkTransform {
+            entity_path: visual.entity_path,
+            transform: support::to_rerun(
+                support::origin(visual.translation, visual.rotation_xyzw),
+                visual.scale,
+            ),
+        }
+    })
+}
+
+/// Log parent-relative link transforms for the current joint positions.
+///
+/// `entity_prefix` is prepended to every generated path. Use the same prefix
+/// when logging visual meshes.
+///
+/// # Errors
+///
+/// Returns the Rerun recording error if a transform cannot be logged.
+pub fn log_rerun_link_transforms(
+    recording: &rerun::RecordingStream,
+    entity_prefix: &str,
+    positions: &JointPositions,
+) -> Result<(), rerun::RecordingStreamError> {
+    log_transform_messages(
+        recording,
+        entity_prefix,
+        &rerun_link_transforms(positions),
+    )
+}
+
+/// Log static visual-mesh transforms. Call this once before streaming joints.
+///
+/// # Errors
+///
+/// Returns the Rerun recording error if a transform cannot be logged.
+pub fn log_rerun_visual_transforms(
+    recording: &rerun::RecordingStream,
+    entity_prefix: &str,
+) -> Result<(), rerun::RecordingStreamError> {
+    log_transform_messages(recording, entity_prefix, &rerun_visual_transforms())
+}
+
+/// Log each visual mesh from the hardware-model cache.
+///
+/// # Errors
+///
+/// Returns a read error when a mesh is missing, or a Rerun error when a mesh
+/// cannot be logged.
+pub fn log_rerun_visual_meshes(
+    recording: &rerun::RecordingStream,
+    entity_prefix: &str,
+    cache_root: &Path,
+) -> Result<(), TransformLogError> {
+    let assets: [VisualAsset; VISUAL_COUNT] = std::array::from_fn(|index| VisualAsset {
+        entity_path: VISUALS[index].entity_path,
+        mesh_resource: VISUALS[index].mesh_resource,
+    });
+    support::log_visual_meshes(recording, entity_prefix, cache_root, &assets)
+}
+
+#[cfg(test)]
+mod tests {
+    use nalgebra::{Quaternion, UnitQuaternion, Vector3};
+
+    use super::{
+        parent_from_link, world_from_link, JointPositions, LINK_COUNT, LINK_PARENT, VISUALS,
+    };
+    use open_stompers_hardware::transforms::rotations_match;
+
+    const ZERO_WORLD: [([f64; 3], [f64; 4]); LINK_COUNT] = [
+{% for pose in zero_poses %}
+        ({{ pose.translation | rust_array }}, {{ pose.quaternion_xyzw | rust_array }}),
+{% endfor %}
+    ];
+
+    const MOVED_WORLD: [([f64; 3], [f64; 4]); LINK_COUNT] = [
+{% for pose in moved_poses %}
+        ({{ pose.translation | rust_array }}, {{ pose.quaternion_xyzw | rust_array }}),
+{% endfor %}
+    ];
+
+    const ORIGIN_ROTATIONS: [(usize, [f64; 3], [f64; 4]); {{ origin_count }}] = [
+{% for link in model.links %}
+{% if link.incoming %}
+        ({{ loop.index0 }}, {{ link.incoming.rpy | rust_array }}, {{ link.incoming.origin.quaternion_xyzw | rust_array }}),
+{% endif %}
+{% endfor %}
+    ];
+
+    #[test]
+    fn zero_configuration_matches_hardware_model() {
+        assert_world_close(&world_from_link(&JointPositions::default()), &ZERO_WORLD);
+    }
+
+    #[test]
+    fn moved_configuration_matches_hardware_model() {
+        let positions = JointPositions::from_array(std::array::from_fn(|index| {
+            0.1 * (index as f64 + 1.0)
+        }));
+        assert_world_close(&world_from_link(&positions), &MOVED_WORLD);
+    }
+
+    #[test]
+    fn world_poses_compose_parent_transforms() {
+        let positions = JointPositions::from_array(std::array::from_fn(|index| {
+            0.1 * (index as f64 + 1.0)
+        }));
+        let local = parent_from_link(&positions);
+        let world = world_from_link(&positions);
+        for index in 1..LINK_COUNT {
+            let composed = world[LINK_PARENT[index]] * local[index];
+            assert!(
+                rotations_match(composed.rotation, world[index].rotation),
+                "link {index} rotation"
+            );
+            assert!(
+                (composed.translation.vector - world[index].translation.vector).norm() < 1e-8,
+                "link {index} translation"
+            );
+        }
+    }
+
+    #[test]
+    fn joint_origin_rotations_match_nalgebra_euler_angles() {
+        for (index, rpy, quaternion_xyzw) in ORIGIN_ROTATIONS {
+            let expected = UnitQuaternion::from_euler_angles(rpy[0], rpy[1], rpy[2]);
+            let actual = UnitQuaternion::new_normalize(Quaternion::new(
+                quaternion_xyzw[3],
+                quaternion_xyzw[0],
+                quaternion_xyzw[1],
+                quaternion_xyzw[2],
+            ));
+            assert!(rotations_match(actual, expected), "link {index} origin");
+        }
+    }
+
+    #[test]
+    fn visual_entities_are_children_of_their_links() {
+        for visual in &VISUALS {
+            assert!(visual.entity_path.starts_with(visual.link.entity_path()));
+        }
+    }
+
+    fn assert_world_close(
+        actual: &[nalgebra::Isometry3<f64>; LINK_COUNT],
+        expected: &[([f64; 3], [f64; 4]); LINK_COUNT],
+    ) {
+        for (index, pose) in actual.iter().enumerate() {
+            let (translation, quaternion_xyzw) = expected[index];
+            let delta = pose.translation.vector
+                - Vector3::new(translation[0], translation[1], translation[2]);
+            assert!(delta.norm() < 1e-6, "link {index} translation {delta:?}");
+            let expected_rotation = UnitQuaternion::new_normalize(Quaternion::new(
+                quaternion_xyzw[3],
+                quaternion_xyzw[0],
+                quaternion_xyzw[1],
+                quaternion_xyzw[2],
+            ));
+            assert!(
+                rotations_match(pose.rotation, expected_rotation),
+                "link {index} rotation"
+            );
+        }
+    }
+}

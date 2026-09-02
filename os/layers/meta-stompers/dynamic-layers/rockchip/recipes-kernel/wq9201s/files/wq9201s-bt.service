@@ -1,0 +1,14 @@
+[Unit]
+Description=Attach the WQ9201S Bluetooth HCI on UART1
+Before=bluetooth.service
+After=systemd-modules-load.service
+ConditionPathExists=/dev/ttyS1
+
+[Service]
+Type=simple
+ExecStart=@LIBEXECDIR@/wq9201s-bt-attach
+# No Restart=: unblocking rfkill power-cycles the controller and wipes the
+# firmware wq_wlan loaded. The script already retries three times.
+
+[Install]
+WantedBy=multi-user.target

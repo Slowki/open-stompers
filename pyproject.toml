@@ -1,0 +1,150 @@
+[project]
+name = "openstompers"
+version = "0.1.0"
+description = "Open Stompers workspace root"
+requires-python = "==3.12.*" # IsaacSim 6.0.1.0 requires 3.12
+dependencies = [
+  "open_stompers_animations",
+  "open_stompers_datasets",
+  "open_stompers_hardware_models",
+  "open_stompers_modeling",
+  "flax>=0.12.9",
+  "jax2onnx>=0.16.1",
+  "jax>=0.11.1,<0.11.2",
+  "jaxtyping>=0.3.11",
+]
+
+[dependency-groups]
+dev = [
+  "ast-grep-cli>=0.45.3",
+  "beartype",
+  "prek>=0.5.3",
+  "pytest",
+  "pytest-cov>=7.1.0",
+  "pytest-xdist>=3.8.0",
+  "ruff",
+  "ty",
+]
+# Enable the CUDA backend with: uv sync --group cuda
+cuda = ["jax[cuda13]>=0.11.1"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+open_stompers_animations = { workspace = true }
+open_stompers_datasets = { workspace = true }
+open_stompers_hardware_models = { workspace = true }
+open_stompers_modeling = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.pytest.ini_options]
+addopts = [
+  "-n=auto",
+  "--import-mode=importlib",
+  "--jaxtyping-packages=open_stompers_modeling.locomotion,open_stompers_training.datasets.recordings,open_stompers_training.robots.mini_pi_plus.task,jaxtyping_typechecker.beartype",
+]
+pythonpath = ["tools"]
+testpaths = ["packages"]
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = [
+  "packages/open_stompers_animations/src",
+  "packages/open_stompers_datasets/src",
+  "packages/open_stompers_hardware_models/src",
+  "packages/open_stompers_interactive_simulation/src",
+  "packages/open_stompers_modeling/src",
+]
+
+[tool.coverage.json]
+show_contexts = true
+
+[tool.coverage.html]
+show_contexts = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["packages"]
+extend-exclude = ["packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers"]
+
+[tool.ruff.lint]
+select = [
+  "A", # flake8-builtins
+  "ANN", # flake8-annotations
+  "ARG", # flake8-unused-arguments
+  "ASYNC", # flake8-async
+  "B", # flake8-bugbear
+  "C4", # flake8-comprehensions
+  "C90", # mccabe
+  "D", # pydocstyle
+  "DTZ", # flake8-datetimez
+  "E", # pycodestyle errors
+  "F", # pyflakes
+  "G", # flake8-logging-format
+  "I", # isort
+  "ICN", # flake8-import-conventions
+  "ISC", # flake8-implicit-str-concat
+  "LOG", # flake8-logging
+  "NPY", # NumPy-specific rules
+  "PERF", # Perflint
+  "PIE", # flake8-pie
+  "PLC0415", # import-outside-top-level
+  "PT", # flake8-pytest-style
+  "PTH", # flake8-use-pathlib'
+  "RET", # flake8-return
+  "S", # flake8-bandit
+  "SIM", # flake8-simplify
+  "UP", # pyupgrade
+  "W", # pycodestyle warnings
+  # The following preview-only rules are omitted until Ruff's preview mode is
+  # intentionally adopted; selecting them in stable mode is a no-op warning.
+  "PLC3002", # unnecessary-direct-lambda-call
+  "PLE", # Error
+  "PLR", # Refactor
+  "PLW", # Warning
+  "UP", # pyupgrade
+  "FURB", # refurb
+  "RUF", # Ruff-specific rules'
+  "TRY", # tryceratops
+]
+ignore = ["C901", "F722", "PLR0913", "PLR0917", "PLR2004", "TRY003", "TRY004", "S314", "S603"]
+
+[tool.ruff.lint.per-file-ignores]
+"packages/*/tests/**/*.py" = [
+  "D103", # Test names and parametrization provide the test documentation.
+  "S101", # Assertions are the native pytest assertion mechanism.
+  "E501", # Test vectors and parametrization are clearer on one line.
+  "PT011", # Tests intentionally exercise broad ValueError contracts.
+  "S", # Test subprocess/XML fixtures are local and controlled.
+]
+
+[tool.ruff.format]
+quote-style = "double"
+# Enable reformatting of code snippets in docstrings.
+docstring-code-format = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = [
+  "open_stompers_animations",
+  "open_stompers_datasets",
+  "open_stompers_hardware_models",
+  "open_stompers_modeling",
+  "open_stompers_schemas",
+]
+
+[tool.ty.environment]
+extra-paths = ["tools"]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["packages"]
+exclude = ["packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers"]

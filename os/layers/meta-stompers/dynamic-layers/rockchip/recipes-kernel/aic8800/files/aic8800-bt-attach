@@ -1,0 +1,39 @@
+#!/bin/sh
+# Attach the AIC8800 Bluetooth controller on UART1 as an H4 HCI.
+#
+# Adapted from pollen-robotics/microduck_yocto (Apache-2.0). hciattach rather
+# than btattach: it sets the line speed with cfsetospeed() and answers at once.
+set -u
+
+# The same image runs on boards with a WQ9201S, so do nothing unless the AIC8800
+# driver bound an SDIO function.
+for _ in $(seq 1 20); do
+    ls /sys/bus/sdio/drivers/aicwf_sdio 2> /dev/null | grep -q : && break
+    sleep 1
+done
+if ! ls /sys/bus/sdio/drivers/aicwf_sdio 2> /dev/null | grep -q :; then
+    echo "No AIC8800 on SDIO, nothing to attach"
+    exit 0
+fi
+
+unblock_bluetooth() {
+    for rfkill in /sys/class/rfkill/*; do
+        [ "$(cat "$rfkill/type")" = bluetooth ] && echo 0 > "$rfkill/soft"
+    done
+}
+
+# An attach against a soft-blocked radio yields a controller that cannot be powered.
+unblock_bluetooth
+hciattach -n -s 1500000 /dev/ttyS1 any 1500000 flow &
+attach_process=$!
+
+# BlueZ adds a second rfkill node for hci0, born blocked.
+for _ in $(seq 1 10); do
+    [ -e /sys/class/bluetooth/hci0 ] && break
+    sleep 0.5
+done
+unblock_bluetooth
+hciconfig hci0 up || true
+
+# hciattach holds the line discipline; the adapter disappears when it exits.
+wait "$attach_process"

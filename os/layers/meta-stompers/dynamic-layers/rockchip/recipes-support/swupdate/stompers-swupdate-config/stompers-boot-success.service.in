@@ -1,0 +1,10 @@
+[Unit]
+Description=Mark the running rootfs slot as good
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'fw_setenv BOOT_$(@BINDIR@/stompers-current-slot)_LEFT 3'
+
+[Install]
+WantedBy=multi-user.target

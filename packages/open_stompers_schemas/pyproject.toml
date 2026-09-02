@@ -1,0 +1,10 @@
+[project]
+name = "open_stompers_schemas"
+version = "0.1.0"
+description = "Generated FlatBuffers types for Open Stompers"
+requires-python = "==3.12.*"
+dependencies = []
+
+[build-system]
+requires = ["uv-build"]
+build-backend = "uv_build"

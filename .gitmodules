@@ -1,0 +1,3 @@
+[submodule "tools/ast-grep"]
+	path = tools/ast-grep
+	url = https://github.com/Slowki/ast-grep-rules.git

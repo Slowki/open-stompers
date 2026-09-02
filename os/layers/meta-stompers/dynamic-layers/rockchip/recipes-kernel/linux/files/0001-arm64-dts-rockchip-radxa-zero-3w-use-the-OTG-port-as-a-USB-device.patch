@@ -1,0 +1,19 @@
+From: Stompers OS <noreply@open-stompers>
+Subject: [PATCH] arm64: dts: rockchip: radxa-zero-3w: use the OTG port as a USB device
+
+Put the USB 2.0 OTG Type-C port in peripheral mode so the board shows up
+as a USB network and serial gadget when plugged into a computer. The USB 3.0
+Type-C port stays a host port.
+
+Upstream-Status: Inappropriate [board configuration]
+---
+--- a/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3w.dts	2026-10-23 15:13:23.632222576 -0700
++++ b/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3w.dts	2026-10-23 15:13:23.637111478 -0700
+@@ -90,3 +90,7 @@
+ 	uart-has-rtscts;
+ 	status = "okay";
+ };
++
++&usb_host0_xhci {
++	dr_mode = "peripheral";
++};

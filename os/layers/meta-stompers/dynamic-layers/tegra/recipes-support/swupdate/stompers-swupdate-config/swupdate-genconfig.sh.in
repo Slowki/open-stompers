@@ -1,0 +1,36 @@
+#!/bin/sh
+# Generate the slot-specific swupdate configuration and sw-versions.
+set -e
+
+datadir=@DATADIR@
+
+. /etc/os-release
+
+if [ "$(nvbootctrl get-current-slot)" -eq 1 ]; then
+    boot_slot="b"
+    alternate_rootfs="APP"
+else
+    boot_slot="a"
+    alternate_rootfs="APP_b"
+fi
+
+serial_number=$(tr -d '\000' < /proc/device-tree/serial-number 2> /dev/null || true)
+[ -n "$serial_number" ] || serial_number="unknown"
+
+mkdir -p /run/swupdate
+sed -e "s,@SWVERSION@,$VERSION_ID," \
+    -e "s,@SERIALNUMBER@,$serial_number," \
+    -e "s,@BOOTSLOT@,$boot_slot," \
+    "$datadir/swupdate/swupdate.cfg.in" > /run/swupdate/swupdate.cfg
+
+# Versions installed in the other slot decide what an update must replace.
+rm -f /run/swupdate/sw-versions
+mount_point=$(mktemp -d)
+if mount -o ro "/dev/disk/by-partlabel/$alternate_rootfs" "$mount_point" 2> /dev/null; then
+    if [ -e "$mount_point$datadir/swupdate/sw-versions-thisslot" ]; then
+        cp "$mount_point$datadir/swupdate/sw-versions-thisslot" /run/swupdate/sw-versions
+    fi
+    umount "$mount_point"
+fi
+rmdir "$mount_point"
+touch /run/swupdate/sw-versions

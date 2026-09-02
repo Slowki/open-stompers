@@ -1,0 +1,14 @@
+[Unit]
+Description=Attach the AIC8800 Bluetooth HCI on UART1
+Before=bluetooth.service
+After=systemd-modules-load.service
+ConditionPathExists=/dev/ttyS1
+
+[Service]
+Type=simple
+ExecStart=@LIBEXECDIR@/aic8800-bt-attach
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

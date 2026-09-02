@@ -1,0 +1,10 @@
+[package]
+name = "open-stompers-schemas"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "FlatBuffers types generated from the shared Open Stompers schemas"
+
+[dependencies]
+flatbuffers = { workspace = true }

@@ -1,0 +1,14 @@
+[package]
+name = "open-stompers-hardware"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Platform-independent hardware interfaces for Open Stompers"
+
+[dependencies]
+nalgebra = { workspace = true }
+open-stompers-schemas = { workspace = true }
+rerun = { workspace = true }
+thiserror = { workspace = true }
+uom = { workspace = true }

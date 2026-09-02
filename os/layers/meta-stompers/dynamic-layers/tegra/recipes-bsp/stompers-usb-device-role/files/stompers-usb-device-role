@@ -1,0 +1,23 @@
+#!/bin/sh
+# Force the USB-C port into device mode when the fusb301 Type-C controller
+# did not probe, so the L4T USB gadget can enumerate on a connected host.
+set -u
+
+for _ in $(seq 1 30); do
+    ls /sys/bus/i2c/drivers/fusb301 2> /dev/null | grep -q -- '-0025' && {
+        echo "fusb301 is bound, leaving the USB role to it"
+        exit 0
+    }
+    role_switch=$(ls -d /sys/class/usb_role/*usb2-0* 2> /dev/null | head -n1)
+    [ -n "$role_switch" ] && break
+    sleep 1
+done
+
+if [ -z "${role_switch:-}" ]; then
+    echo "No role switch for the USB2 port 0 found" >&2
+    exit 1
+fi
+
+echo "fusb301 is not bound, forcing $role_switch to device mode"
+echo device > "$role_switch/role"
+cat "$role_switch/role"

@@ -1,0 +1,4 @@
+# FlatBuffers compiler output. GitHub Linguist uses this metadata to treat
+# these files as generated code.
+packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers/** linguist-generated=true
+crates/open-stompers-schemas/src/generated/** linguist-generated=true

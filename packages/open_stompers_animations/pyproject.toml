@@ -1,0 +1,25 @@
+[project]
+name = "open_stompers_animations"
+version = "0.1.0"
+description = "Procedural locomotion and action animations for Open Stompers robots"
+requires-python = "==3.12.*"
+dependencies = [
+  "mujoco>=3.14.0",
+  "numpy>=2.2",
+  "pyarrow>=19",
+  "rerun-sdk>=0.27.0",
+  "scipy>=1.15",
+  "open_stompers_datasets",
+  "open_stompers_hardware_models",
+]
+
+[tool.uv.sources]
+open_stompers_datasets = { workspace = true }
+open_stompers_hardware_models = { workspace = true }
+
+[build-system]
+requires = ["uv-build"]
+build-backend = "uv_build"
+
+[project.scripts]
+animations = "open_stompers_animations.cli:main"

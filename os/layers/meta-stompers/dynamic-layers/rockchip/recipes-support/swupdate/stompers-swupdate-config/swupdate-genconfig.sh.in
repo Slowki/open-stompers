@@ -1,0 +1,21 @@
+#!/bin/sh
+# Generate the slot-specific swupdate configuration.
+set -e
+
+datadir=@DATADIR@
+
+. /etc/os-release
+
+case "$(@BINDIR@/stompers-current-slot)" in
+    B) boot_slot="b" ;;
+    *) boot_slot="a" ;;
+esac
+
+serial_number=$(tr -d '\000' < /proc/device-tree/serial-number 2> /dev/null || true)
+[ -n "$serial_number" ] || serial_number="unknown"
+
+mkdir -p /run/swupdate
+sed -e "s,@SWVERSION@,$VERSION_ID," \
+    -e "s,@SERIALNUMBER@,$serial_number," \
+    -e "s,@BOOTSLOT@,$boot_slot," \
+    "$datadir/swupdate/swupdate.cfg.in" > /run/swupdate/swupdate.cfg

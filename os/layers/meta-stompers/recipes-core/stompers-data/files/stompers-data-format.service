@@ -1,0 +1,11 @@
+[Unit]
+Description=Format the persistent data partition on first boot
+DefaultDependencies=no
+BindsTo=dev-disk-by\x2dpartlabel-data.device
+After=dev-disk-by\x2dpartlabel-data.device
+Before=systemd-fsck@dev-disk-by\x2dpartlabel-data.service data.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@LIBEXECDIR@/stompers-data-format

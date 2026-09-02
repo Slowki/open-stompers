@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Rust
+/target/
+
+# Environments
+.venv/
+.envrc.local
+
+# Generated
+MUJOCO_LOG.TXT
+
+# Generated robot exports
+generated/
+/datasets/
+/packages/hardware_models/data

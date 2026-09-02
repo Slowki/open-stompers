@@ -1,0 +1,8 @@
+# Overlay for a platform configuration, e.g. kas/radxa-zero-3w.yml:kas/sdk.yml.
+header:
+  version: 18
+
+target:
+  - stompers-image
+
+task: populate_sdk

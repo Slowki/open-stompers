@@ -1,0 +1,18 @@
+#!/bin/bash -e
+
+if (($#)); then
+  files=("$@")
+else
+  mapfile -d '' files < <(
+    {
+      git diff --name-only -z HEAD --diff-filter=ACMRTUXB
+      git ls-files --others --exclude-standard -z
+    } | sort -zu
+  )
+fi
+
+if ((${#files[@]})); then
+  uv run prek run --files "${files[@]}"
+else
+  echo "No files to fix" > /dev/stderr
+fi

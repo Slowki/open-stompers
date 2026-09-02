@@ -1,0 +1,24 @@
+[package]
+name = "open-stompers-mini-pi"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Mini Pi hardware drivers for Open Stompers"
+
+[dependencies]
+nalgebra = { workspace = true }
+ort = { workspace = true }
+open-stompers-hardware = { workspace = true }
+rerun = { workspace = true }
+serialport = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-serial = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uom = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

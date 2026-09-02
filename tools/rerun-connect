@@ -1,0 +1,2 @@
+#!/bin/bash -e
+exec uvx --from rerun-sdk rerun --connect "rerun+http://${1:?Usage: rerun-connect HOST}:9876/proxy"

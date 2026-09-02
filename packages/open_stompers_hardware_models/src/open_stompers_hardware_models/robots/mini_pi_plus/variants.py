@@ -1,0 +1,11 @@
+"""Mini Pi Plus hardware variants."""
+
+from enum import StrEnum
+
+
+class MiniPiPlusVariant(StrEnum):
+    """Mini Pi Plus hardware variant."""
+
+    TWELVE_LEG_TEN_ARM_WITHOUT_GRIPPERS_WITHOUT_HEAD_WITH_WAIST = "PiPlus_S_12L10A0G0H1W"
+    TWELVE_LEG_EIGHT_ARM_WITHOUT_GRIPPERS_WITH_HEAD_WITHOUT_WAIST = "PiPlus_S_12L8A0G2H0W"
+    TWELVE_LEG_EIGHT_ARM_WITHOUT_GRIPPERS_WITH_HEAD_WITH_WAIST = "PiPlus_S_12L8A0G2H1W"

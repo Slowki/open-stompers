@@ -1,0 +1,25 @@
+#!/bin/bash
+# Collect coverage separately from ordinary pytest timing runs.
+set -uo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
+
+output_dir="${COVERAGE_OUTPUT_DIR:-generated/coverage}"
+mkdir -p "$output_dir" || exit 1
+export COVERAGE_FILE="$output_dir/.coverage"
+
+{
+  if (($#)); then
+    echo "Custom pytest arguments: coverage may be partial."
+    printf 'Arguments:'
+    printf ' %q' "$@"
+    printf '\n'
+  else
+    echo "Default suite coverage (environment-dependent skips still apply)."
+  fi
+  uv run pytest "$@" --cov --cov-context=test --durations=30 \
+    --cov-report=term-missing \
+    --cov-report="html:$output_dir/html" \
+    --cov-report="json:$output_dir/coverage.json" \
+    --junitxml="$output_dir/junit.xml"
+} 2>&1 | tee "$output_dir/pytest.log"
+exit "${PIPESTATUS[0]}"

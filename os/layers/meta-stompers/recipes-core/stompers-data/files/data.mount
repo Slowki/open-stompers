@@ -1,0 +1,13 @@
+[Unit]
+Description=Persistent data partition
+Wants=stompers-data-format.service systemd-fsck@dev-disk-by\x2dpartlabel-data.service
+After=stompers-data-format.service systemd-fsck@dev-disk-by\x2dpartlabel-data.service
+
+[Mount]
+What=/dev/disk/by-partlabel/data
+Where=/data
+Type=ext4
+Options=noatime
+
+[Install]
+WantedBy=local-fs.target

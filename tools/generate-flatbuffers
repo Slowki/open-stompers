@@ -1,0 +1,37 @@
+#!/bin/bash
+# Regenerate Python and Rust FlatBuffers bindings from schemas/.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root"
+
+if ! command -v flatc >/dev/null 2>&1; then
+  echo "error: flatc is not installed. Install the FlatBuffers compiler: https://flatbuffers.dev" >&2
+  exit 1
+fi
+
+mapfile -d '' schemas < <(find schemas -type f -name '*.fbs' -print0 | sort -z)
+if ((${#schemas[@]} == 0)); then
+  echo "error: no FlatBuffers schemas found in schemas/" >&2
+  exit 1
+fi
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+python_dir="packages/open_stompers_schemas/src/open_stompers_schemas"
+mkdir -p "$python_dir" "$tmp/python"
+flatc --python --warnings-as-errors -o "$tmp/python" -I schemas "${schemas[@]}"
+find "$python_dir" -mindepth 1 -maxdepth 1 ! -name '__init__.py' -exec rm -rf {} +
+cp -a "$tmp/python"/. "$python_dir"/
+
+rust_dir="crates/open-stompers-schemas/src/generated"
+mkdir -p "$tmp/rust"
+flatc --rust --rust-module-root-file --warnings-as-errors -o "$tmp/rust" -I schemas "${schemas[@]}"
+rm -rf "$rust_dir"
+mkdir -p "$rust_dir"
+cp -a "$tmp/rust"/. "$rust_dir"/
+
+if command -v rustfmt >/dev/null 2>&1; then
+  find "$rust_dir" -type f -name '*.rs' -print0 | xargs -0 rustfmt --edition 2024
+fi

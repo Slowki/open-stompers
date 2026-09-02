@@ -1,0 +1,43 @@
+# Stompers OS A/B boot script, adapted from meta-rockchip's RAUC demo.
+#
+# BOOT_ORDER lists the slots to try. Each boot decrements the chosen slot's
+# BOOT_<slot>_LEFT counter. Userspace resets the counter once the boot succeeded,
+# so a slot that fails three times in a row is skipped.
+
+test -n "${BOOT_ORDER}" || env set BOOT_ORDER "A B"
+test -n "${BOOT_A_LEFT}" || env set BOOT_A_LEFT 3
+test -n "${BOOT_B_LEFT}" || env set BOOT_B_LEFT 3
+
+env set stompers_slot
+
+for slot in "${BOOT_ORDER}"; do
+  if test "x${stompers_slot}" != "x"; then
+    # A slot is already selected.
+  elif test "x${slot}" = "xA"; then
+    if test ${BOOT_A_LEFT} -gt 0; then
+      setexpr BOOT_A_LEFT ${BOOT_A_LEFT} - 1
+      env set stompers_slot A
+    fi
+  elif test "x${slot}" = "xB"; then
+    if test ${BOOT_B_LEFT} -gt 0; then
+      setexpr BOOT_B_LEFT ${BOOT_B_LEFT} - 1
+      env set stompers_slot B
+    fi
+  fi
+done
+
+if test -z "${stompers_slot}"; then
+  echo "No bootable slot left, resetting boot attempts"
+  env set BOOT_A_LEFT 3
+  env set BOOT_B_LEFT 3
+  env save
+  reset
+fi
+
+echo "Booting slot ${stompers_slot}"
+env save
+
+part number ${devtype} ${devnum} rootfs${stompers_slot} stompers_part
+env set bootargs "@BOOTARGS@ root=PARTLABEL=rootfs${stompers_slot} stompers.slot=${stompers_slot}"
+ext4load ${devtype} ${devnum}:${stompers_part} ${kernel_addr_r} @KERNEL_BOOTFILE@
+bootm ${kernel_addr_r}

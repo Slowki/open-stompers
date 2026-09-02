@@ -1,0 +1,10 @@
+        <partition name="data" id="17" type="data">
+            <allocation_policy> sequential </allocation_policy>
+            <filesystem_type> basic </filesystem_type>
+            <size> 4294967296 </size>
+            <file_system_attribute> 0 </file_system_attribute>
+            <allocation_attribute> 0x808 </allocation_attribute>
+            <align_boundary> 16384 </align_boundary>
+            <percent_reserved> 0 </percent_reserved>
+            <description> Persistent data shared by both rootfs slots. Fills the rest of the disk. </description>
+        </partition>

@@ -1,0 +1,36 @@
+#!/bin/sh
+# Seed the persistent directories on /data from the running rootfs slot and
+# bind-mount them over their rootfs locations.
+set -e
+
+seed_directory() {
+  source="$1"
+  target="$2"
+  mode="$3"
+  [ -d "$target" ] && return 0
+  rm -rf "$target.partial"
+  if [ -d "$source" ]; then
+    cp -a "$source" "$target.partial"
+  else
+    mkdir -p "$target.partial"
+  fi
+  chmod "$mode" "$target.partial"
+  sync
+  mv "$target.partial" "$target"
+}
+
+bind_directory() {
+  source="$1"
+  target="$2"
+  mountpoint -q "$target" && return 0
+  mkdir -p "$target"
+  mount -o bind "$source" "$target"
+}
+
+seed_directory /home /data/home 0755
+seed_directory /var/lib/iwd /data/iwd 0700
+mkdir -p -m 0755 /data/ssh
+
+bind_directory /data/home /home
+bind_directory /data/iwd /var/lib/iwd
+bind_directory /data/ssh /etc/ssh/hostkeys

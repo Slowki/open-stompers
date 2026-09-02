@@ -1,0 +1,20 @@
+#!/bin/sh
+# Create a filesystem on the data partition if it has none yet.
+set -e
+
+device=/dev/disk/by-partlabel/data
+
+echo "Probing $device ($(readlink -f "$device"))"
+# blkid -p also reports the partition table entry, so check for a filesystem type.
+fstype=$(blkid -p -s TYPE -o value "$device" 2> /dev/null || true)
+case "$fstype" in
+  ext4) echo "Found an ext4 filesystem, leaving it alone" ;;
+  "")
+    echo "No filesystem found, formatting $device as ext4"
+    mkfs.ext4 -q -F -L data "$device"
+    ;;
+  *)
+    echo "Found an unexpected $fstype filesystem, not touching it" >&2
+    exit 1
+    ;;
+esac

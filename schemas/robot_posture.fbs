@@ -1,0 +1,23 @@
+// Canonical robot posture values shared across languages.
+
+namespace open_stompers;
+
+/// The posture of the robot.
+enum RobotPosture : ubyte {
+  /// The posture is missing or could not be classified.
+  Unknown = 0,
+  /// Jumping, flipping, cartwheels, and other dynamic actions.
+  Jumping = 1,
+  /// Standing, walking, running, and similar upright locomotion.
+  Standing = 2,
+  /// Sitting on a chair, a raised surface, or another object.
+  SittingOnObject = 3,
+  /// Sitting on the ground.
+  SittingOnGround = 4,
+  /// Squatting.
+  Squatting = 5,
+  /// Lying down.
+  LyingDown = 6,
+  /// Picked up by a human, hanging off a gantry, or otherwise held.
+  Held = 7,
+}

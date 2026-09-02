@@ -1,0 +1,90 @@
+software =
+{
+	version = "@@DISTRO_VERSION@@";
+
+	@@MACHINE@@ = {
+		hardware-compatibility: [ "1.0" ];
+		system = {
+			slot_a : {
+				partitions: (
+					{
+						type = "diskformat";
+						device = "@@ROOTFS_DEVICE_PATH@@/APP_b";
+						properties: {
+							fstype = "ext4";
+							force = "true";
+						};
+					}
+				);
+				images: (
+					{
+						filename = "@@ROOTFS_FILENAME@@";
+						type = "archive";
+						device = "@@ROOTFS_DEVICE_PATH@@/APP_b";
+						filesystem = "ext4";
+						path = "/";
+						installed-directly = true;
+						preserve-attributes = true;
+						sha256 = "$swupdate_get_sha256(@@ROOTFS_FILENAME@@)";
+					}
+				);
+				files: (
+					{
+						filename = "tegra-bl.cap";
+						path = "@@STOMPERS_SWUPDATE_CAPSULE_INSTALL_PATH@@";
+						properties = { create-destination = "true"; };
+						name = "tegra-bootloader-capsule";
+						version = "@@STOMPERS_SWUPDATE_BOOTLOADER_VERSION@@";
+					}@@OPTIONAL_ESP_UPDATE@@
+				);
+				scripts: (
+					{
+						filename = "stompers-swupdate-script.lua";
+						type = "lua";
+						sha256 = "$swupdate_get_sha256(stompers-swupdate-script.lua)";
+					}
+				);
+			};
+			slot_b : {
+				partitions: (
+					{
+						type = "diskformat";
+						device = "@@ROOTFS_DEVICE_PATH@@/APP";
+						properties: {
+							fstype = "ext4";
+							force = "true";
+						};
+					}
+				);
+				images: (
+					{
+						filename = "@@ROOTFS_FILENAME@@";
+						type = "archive";
+						device = "@@ROOTFS_DEVICE_PATH@@/APP";
+						filesystem = "ext4";
+						path = "/";
+						installed-directly = true;
+						preserve-attributes = true;
+						sha256 = "$swupdate_get_sha256(@@ROOTFS_FILENAME@@)";
+					}
+				);
+				files: (
+					{
+						filename = "tegra-bl.cap";
+						path = "@@STOMPERS_SWUPDATE_CAPSULE_INSTALL_PATH@@";
+						properties = { create-destination = "true"; };
+						name = "tegra-bootloader-capsule";
+						version = "@@STOMPERS_SWUPDATE_BOOTLOADER_VERSION@@";
+					}@@OPTIONAL_ESP_UPDATE@@
+				);
+				scripts: (
+					{
+						filename = "stompers-swupdate-script.lua";
+						type = "lua";
+						sha256 = "$swupdate_get_sha256(stompers-swupdate-script.lua)";
+					}
+				);
+			};
+		};
+	};
+}

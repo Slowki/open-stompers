@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""Launch TensorBoard for the generated training runs."""
+
+import subprocess
+import sys
+
+
+def main() -> int:
+    """Launch TensorBoard and return its exit status."""
+    command = [
+        "uv",
+        "tool",
+        "run",
+        "--with=tensorboard-plugin-profile",
+        "--from=tensorboard",
+        "tensorboard",
+        "--logdir",
+        "generated/",
+        "--samples_per_plugin",
+        "images=100000",
+        *sys.argv[1:],
+    ]
+    return subprocess.run(command, check=False).returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())

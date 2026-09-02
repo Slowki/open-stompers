@@ -1,0 +1,30 @@
+[package]
+name = "open-stompers"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Open Stompers robot driver entrypoint"
+
+[[bin]]
+name = "gamepad-probe"
+path = "src/bin/gamepad_probe.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+dirs = { workspace = true }
+gilrs = { workspace = true }
+open-stompers-microduck = { workspace = true }
+open-stompers-mini-pi = { workspace = true }
+open-stompers-hardware = { workspace = true }
+rerun = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uom = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

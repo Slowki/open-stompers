@@ -1,0 +1,83 @@
+exclude: tools/ast-grep/tests/__snapshots__
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        # Context lines in patch files can end in whitespace.
+        exclude: ^packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers/|\.patch$
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-illegal-windows-names
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+  - repo: local
+    hooks:
+      - id: update-hardware-transforms
+        name: update hardware transforms
+        entry: uv run open_stompers_hardware_models generate-transforms
+        language: system
+        types: [python]
+        files: "^packages/open_stompers_hardware_models/src/open_stompers_hardware_models/.*"
+        pass_filenames: false
+
+      - id: update-flatbuffers
+        name: update FlatBuffers
+        entry: tools/generate-flatbuffers
+        language: system
+        files: '^(schemas/.*\.fbs|tools/generate-flatbuffers)$'
+        pass_filenames: false
+
+      - id: cargo-fmt
+        name: cargo fmt (check)
+        entry: cargo fmt --all -- --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-clippy
+        name: cargo clippy (lint)
+        entry: cargo clippy --workspace --all-targets -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: ruff
+        name: ruff (lint)
+        entry: uv run ruff check --fix --show-fixes
+        language: system
+        types: [python]
+        exclude: ^packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers/
+
+      - id: ruff-format
+        name: ruff (format)
+        entry: uv run ruff format
+        language: system
+        types: [python]
+        exclude: ^packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers/
+
+      - id: ast-grep
+        name: ast-grep
+        entry: uv run ast-grep scan --update-all
+        language: system
+        types: [python]
+        exclude: ^packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers/
+
+      - id: oxfmt
+        name: oxfmt (format)
+        entry: npx --yes oxfmt@0.66.0
+        env:
+          CI: "1"
+          NO_COLOR: "1"
+        language: system
+        require_serial: true
+        args: [--no-error-on-unmatched-pattern]
+        types: [text]
+        exclude: ^packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers/
+
+      - id: ty
+        name: ty (type check)
+        entry: uv run ty check
+        language: system
+        types: [python]
+        exclude: ^packages/open_stompers_schemas/src/open_stompers_schemas/open_stompers/

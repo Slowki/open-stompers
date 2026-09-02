@@ -1,0 +1,6 @@
+[Unit]
+After=setup-nv-boot-control.service
+Requires=setup-nv-boot-control.service
+
+[Service]
+ExecStartPre=@LIBEXECDIR@/swupdate/swupdate-genconfig

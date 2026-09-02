@@ -1,0 +1,66 @@
+software =
+{
+	version = "@@DISTRO_VERSION@@";
+
+	@@MACHINE@@ = {
+		hardware-compatibility: [ "1.0" ];
+		system = {
+			slot_a : {
+				partitions: (
+					{
+						type = "diskformat";
+						device = "@@ROOTFS_DEVICE_PATH@@/rootfsB";
+						properties: {
+							fstype = "ext4";
+							force = "true";
+						};
+					}
+				);
+				images: (
+					{
+						filename = "@@ROOTFS_FILENAME@@";
+						type = "archive";
+						device = "@@ROOTFS_DEVICE_PATH@@/rootfsB";
+						filesystem = "ext4";
+						path = "/";
+						installed-directly = true;
+						preserve-attributes = true;
+						sha256 = "$swupdate_get_sha256(@@ROOTFS_FILENAME@@)";
+					}
+				);
+				bootenv: (
+					{ name = "BOOT_ORDER"; value = "B A"; },
+					{ name = "BOOT_B_LEFT"; value = "3"; }
+				);
+			};
+			slot_b : {
+				partitions: (
+					{
+						type = "diskformat";
+						device = "@@ROOTFS_DEVICE_PATH@@/rootfsA";
+						properties: {
+							fstype = "ext4";
+							force = "true";
+						};
+					}
+				);
+				images: (
+					{
+						filename = "@@ROOTFS_FILENAME@@";
+						type = "archive";
+						device = "@@ROOTFS_DEVICE_PATH@@/rootfsA";
+						filesystem = "ext4";
+						path = "/";
+						installed-directly = true;
+						preserve-attributes = true;
+						sha256 = "$swupdate_get_sha256(@@ROOTFS_FILENAME@@)";
+					}
+				);
+				bootenv: (
+					{ name = "BOOT_ORDER"; value = "A B"; },
+					{ name = "BOOT_A_LEFT"; value = "3"; }
+				);
+			};
+		};
+	};
+}

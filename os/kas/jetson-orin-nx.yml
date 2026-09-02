@@ -1,0 +1,18 @@
+header:
+  version: 18
+  includes:
+    - os/kas/common.yml
+
+# Jetson Orin NX 16GB on the Orin Nano developer kit carrier.
+machine: p3768-0000-p3767-0000
+
+repos:
+  meta-tegra:
+    url: https://github.com/OE4T/meta-tegra.git
+    branch: wrynose
+    path: layers/meta-tegra
+
+local_conf_header:
+  jetson: |
+    # zed-sdk is under Stereolabs' proprietary license (doc/license/LICENSE.txt in the SDK).
+    LICENSE_FLAGS_ACCEPTED:append = " stereolabs"

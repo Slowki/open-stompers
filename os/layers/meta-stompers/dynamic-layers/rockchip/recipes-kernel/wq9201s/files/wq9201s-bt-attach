@@ -1,0 +1,47 @@
+#!/bin/sh
+# Attach the WQ9201S Bluetooth controller on UART1 as an H4 HCI.
+#
+# Adapted from pollen-robotics/microduck_yocto (Apache-2.0), which follows
+# Seeed's image:
+#   - wq_wlan downloads the Bluetooth firmware over SDIO; wlan0 appearing means
+#     it is done, and attaching earlier gets a controller that never answers.
+#   - H4 at 1500000 through btattach. Never try H5 (3wire) in the same boot: it
+#     locks the controller out of H4 until the next reboot.
+#   - A controller reporting an all-zero address did not come up; retry.
+set -u
+
+# The same image runs on boards with an AIC8800, which also has a wlan0, so do
+# nothing unless wq_wlan bound an SDIO function.
+if ! ls /sys/bus/sdio/drivers/wq_sdio 2> /dev/null | grep -q :; then
+    echo "No WQ9201S on SDIO, nothing to attach"
+    exit 0
+fi
+
+for _ in $(seq 1 30); do
+    [ -e /sys/class/net/wlan0 ] && break
+    sleep 1
+done
+sleep 3
+
+for attempt in 1 2 3; do
+    pkill -f 'btattach.*ttyS1' 2> /dev/null
+    sleep 1
+    btattach -B /dev/ttyS1 -N -P h4 -S 1500000 > /dev/null 2>&1 &
+    sleep 4
+    address=$(hciconfig hci0 2> /dev/null | grep -oE '([0-9A-F]{2}:){5}[0-9A-F]{2}' | head -n1)
+    if [ -n "$address" ] && [ "$address" != "00:00:00:00:00:00" ]; then
+        # BlueZ adds a second rfkill node for hci0, born blocked.
+        for rfkill in /sys/class/rfkill/*; do
+            [ "$(cat "$rfkill/type")" = bluetooth ] && echo 0 > "$rfkill/soft"
+        done
+        hciconfig hci0 up
+        echo "WQ9201S Bluetooth up, address $address"
+        # btattach holds the line discipline; stay in the foreground with it.
+        wait
+        exit 0
+    fi
+    echo "WQ9201S Bluetooth attach attempt $attempt failed (address '$address')" >&2
+done
+
+echo "WQ9201S Bluetooth failed after 3 attempts" >&2
+exit 1

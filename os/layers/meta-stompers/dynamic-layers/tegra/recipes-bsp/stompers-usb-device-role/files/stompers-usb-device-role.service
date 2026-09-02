@@ -1,0 +1,12 @@
+[Unit]
+Description=Put the USB-C port in device mode when the Type-C controller is missing
+After=systemd-modules-load.service systemd-udev-trigger.service
+Before=usb-gadget.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@LIBEXECDIR@/stompers-usb-device-role
+
+[Install]
+WantedBy=multi-user.target

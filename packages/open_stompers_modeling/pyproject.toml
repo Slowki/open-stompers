@@ -1,0 +1,18 @@
+[project]
+name = "open_stompers_modeling"
+version = "0.1.0"
+description = "Neural network modeling for Open Stompers"
+requires-python = "==3.12.*"
+dependencies = [
+  "jax>=0.11.1",
+  "flax>=0.12.9",
+  "orbax-checkpoint>=0.11.36",
+  "jaxtyping>=0.3.11",
+  "numpy>=2.5.2",
+  "tokamax>=0.0.14",
+  "jax2onnx>=0.16.1",
+]
+
+[build-system]
+requires = ["uv-build"]
+build-backend = "uv_build"

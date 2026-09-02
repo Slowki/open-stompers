@@ -1,0 +1,22 @@
+[package]
+name = "open-stompers-microduck"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Microduck hardware drivers for Open Stompers"
+
+[dependencies]
+nalgebra = { workspace = true }
+open-stompers-hardware = { workspace = true }
+rerun = { workspace = true }
+serialport = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-serial = { workspace = true }
+tracing = { workspace = true }
+uom = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
